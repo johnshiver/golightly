@@ -6,12 +6,17 @@ provider:
   runtime: go1.x
 
 functions:
-  hello:
-    handler: bin/hello
+  http-router:
+    handler: bin/http
+    timeout: 30
+    package:
+      include:
+        - bin/http
     events:
       - http:
-          path: hello
-          method: get
+          path: /{proxy+}
+          method: any
+          cors: true
 
 package:
   exclude:

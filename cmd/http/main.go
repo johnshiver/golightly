@@ -1,45 +1,38 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/akrylysov/algnhsa"
+	"github.com/julienschmidt/httprouter"
 )
 
-// Response is of type APIGatewayProxyResponse since we're leveraging the
-// AWS Lambda Proxy Request functionality (default behavior)
-//
-// https://serverless.com/framework/docs/providers/aws/events/apigateway/#lambda-proxy-integration
-type Response events.APIGatewayProxyResponse
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("index"))
+}
 
-// Handler is our lambda handler invoked by the `lambda.Start` function call
-func Handler(ctx context.Context) (Response, error) {
-	var buf bytes.Buffer
+func addHandler(w http.ResponseWriter, r *http.Request) {
+	f, _ := strconv.Atoi(r.FormValue("first"))
+	s, _ := strconv.Atoi(r.FormValue("second"))
+	w.Header().Set("X-Hi", "foo")
+	fmt.Fprintf(w, "%d", f+s)
+}
 
-	body, err := json.Marshal(map[string]interface{}{
-		"message": "Go Serverless v1.0! Your function executed successfully!",
-	})
-	if err != nil {
-		return Response{StatusCode: 404}, err
+func contextHandler(w http.ResponseWriter, r *http.Request) {
+	proxyReq, ok := algnhsa.ProxyRequestFromContext(r.Context())
+	if ok {
+		resp := fmt.Sprintf("your request id: %s", proxyReq.RequestContext.RequestID)
+		fmt.Fprint(w, resp)
 	}
-	json.HTMLEscape(&buf, body)
-
-	resp := Response{
-		StatusCode:      200,
-		IsBase64Encoded: false,
-		Body:            buf.String(),
-		Headers: map[string]string{
-			"Content-Type":           "application/json",
-			"X-MyCompany-Func-Reply": "hello-handler",
-		},
-	}
-
-	return resp, nil
 }
 
 func main() {
-	lambda.Start(Handler)
+	router := httprouter.New()
+	router.HandlerFunc("GET", "/index", indexHandler)
+	router.HandlerFunc("GET", "/add", addHandler)
+	router.HandlerFunc("GET", "/context", contextHandler)
+	algnhsa.ListenAndServe(router, nil)
 }
+
